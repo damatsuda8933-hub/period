@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>经期记录</title>
+<style>
+  :root{
+    --bg:#e9f7ef; --card:#ffffff; --ink:#1b4332; --muted:#5c7a6b; --line:#cce3d5;
+    --pink:#ff8ba7;   /* 经期 */
+    --mint:#ccffd8;   /* 卵泡期 */
+    --blue:#8be9ff;   /* 排卵高峰（3天）*/
+    --gold:#ffeaa7;   /* 黄体期 */
+    --today:#1b4332;
+  }
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"PingFang SC","Noto Sans SC",sans-serif}
+  .wrap{max-width:780px;margin:24px auto;padding:0 16px 36px}
+  h1{font-size:20px;margin:16px 0}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  input,button,select,textarea{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+  button.primary{background:#2d6a4f;color:#fff;border-color:#2d6a4f}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:12px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
+  .sw{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:6px}
+  .sw.p{background:var(--pink)} .sw.f{background:var(--mint)} .sw.o{background:var(--blue)} .sw.l{background:var(--gold)}
+  .cal{width:100%;border-collapse:collapse;margin-top:8px}
+  .cal th,.cal td{border:1px solid var(--line);width:14.285%;vertical-align:top;text-align:center}
+  .cal th{background:#f2fbf6;padding:8px 0;font-weight:600}
+  .cal td{height:90px;position:relative;background:#fff;cursor:pointer}
+  .cal td.p{background:var(--pink)}
+  .cal td.f{background:var(--mint)}
+  .cal td.o{background:var(--blue)}
+  .cal td.l{background:var(--gold)}
+  .cal td .d{position:absolute;top:6px;left:6px;font-size:12px;color:#2c3e50}
+  .cal td.today{outline:2px dashed var(--today);outline-offset:-4px}
+  .note{position:absolute;bottom:6px;left:6px;right:6px;display:flex;justify-content:space-between;gap:6px;align-items:flex-end}
+  .icons{font-size:14px;display:flex;gap:6px}
+  .toolbar{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+  .toolbar .nav button{padding:6px 10px}
+  .muted{color:var(--muted);font-size:14px}
+  dialog{border:none;border-radius:12px;padding:0;max-width:380px;width:92%}
+  .dlg{padding:14px}
+  .dlg h3{margin:0 0 8px 0;font-size:16px}
+  .moon-row{display:flex;gap:6px;flex-wrap:wrap}
+  .moon{font-size:22px;line-height:40px;width:40px;height:40px;display:grid;place-items:center;border:1px solid var(--line);border-radius:8px;cursor:pointer;background:#fff}
+  .moon.sel{outline:2px solid #2d6a4f}
+  .footer{margin-top:2px;padding:10px;background:#f6fcf9;border-top:1px solid var(--line);border-bottom-left-radius:12px;border-bottom-right-radius:12px}
+  .kbd{font-family:ui-monospace,Menlo,Consolas,monospace;background:#eef6f0;border:1px solid var(--line);border-radius:6px;padding:2px 6px}
+  .thumb{width:100%;max-height:200px;object-fit:contain;border:1px solid var(--line);border-radius:8px;background:#fff}
+  .settings .row{gap:6px}
+  .danger{background:#8c2f39;color:#fff;border-color:#8c2f39}
+  /* 锁屏 */
+  #lock::backdrop{background:rgba(0,0,0,.35)}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <h1>经期记录</h1>
+
+  <!-- 周期录入 -->
+  <div class="card">
+    <div class="row">
+      <label>本次月经第 1 天 <input type="date" id="startDate"></label>
+      <label>经期天数 <input type="number" id="periodLength" value="5" min="1" max="12" style="width:90px"></label>
+      <label>平均周期 <input type="number" id="cycleLength" value="28" min="18" max="60" style="width:90px"></label>
+      <button class="primary" id="saveCycle">保存/更新此周期</button>
+      <button id="setDefaults" title="将当前数值设为默认">设为默认</button>
+    </div>
+    <div class="muted" style="margin-top:6px">支持长期保存多个周期；预测使用最近 6 次中位数，仅供参考。</div>
+  </div>
+
+  <!-- 日历工具栏 -->
+  <div class="toolbar">
+    <div class="nav">
+      <button id="prevM">◀ 上月</button>
+      <button id="today">今月</button>
+      <button id="nextM">下月 ▶</button>
+    </div>
+    <div class="muted" id="monthLabel"></div>
+  </div>
+
+  <!-- 图例 -->
+  <div class="legend card">
+    <div><span class="sw p"></span>经期</div>
+    <div><span class="sw f"></span>卵泡期</div>
+    <div><span class="sw o"></span>排卵高峰（3 天）</div>
+    <div><span class="sw l"></span>黄体期</div>
+    <div>心情：任意 emoji；月相：🌑 / 🌒 / 🌗 / 🌕　（只显示图标）</div>
+    <div>📷：有图片　💬：有肌肤记录</div>
+  </div>
+
+  <!-- 日历 -->
+  <div class="card" id="calendarCard">
+    <table class="cal" id="cal"></table>
+  </div>
+
+  <!-- 摘要 -->
+  <div class="card" id="summary"></div>
+
+  <!-- 设置/备份 -->
+  <div class="card settings">
+    <div class="row" style="flex-wrap:wrap">
+      <button id="exportBtn">导出备份</button>
+      <input id="importFile" type="file" accept="application/json" style="display:none">
+      <button id="importBtn">导入备份</button>
+      <button id="icsBtn">导出 .ics（下次预测）</button>
+      <button id="setPIN">设置/修改 PIN</button>
+      <button id="clearPIN">关闭 PIN</button>
+      <button class="danger" id="wipeAll">一键清空</button>
+    </div>
+    <div class="muted" style="margin-top:6px">图片与大数据保存在浏览器本地（IndexedDB）；导出备份会包含图片。</div>
+  </div>
+</div>
+
+<!-- 编辑对话框 -->
+<dialog id="editor">
+  <div class="dlg">
+    <h3 id="dlgTitle">编辑</h3>
+    <div class="row" style="margin:6px 0 6px 0">
+      <label>心情 <input id="moodInput" placeholder="🙂 / 😴 / 😠 ..." style="width:140px"></label>
+      <label>阶段覆盖
+        <select id="phaseOverride">
+          <option value="">自动</option>
+          <option value="p">经期</option>
+          <option value="f">卵泡期</option>
+          <option value="o">排卵高峰</option>
+          <option value="l">黄体期</option>
+        </select>
+      </label>
+    </div>
+    <div>
+      <div class="muted" style="margin-bottom:4px">月相</div>
+      <div class="moon-row" id="moonRow">
+        <div class="moon" data-v="1" title="低">🌑</div>
+        <div class="moon" data-v="2" title="较低">🌒</div>
+        <div class="moon" data-v="3" title="中">🌗</div>
+        <div class="moon" data-v="4" title="高">🌕</div>
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <div class="muted" style="margin-bottom:4px">肌肤记录（文本）</div>
+      <textarea id="skinText" rows="3" placeholder="如：今日泛红减轻，屏障感较稳…" style="width:100%"></textarea>
+    </div>
+    <div style="margin-top:10px">
+      <div class="muted" style="margin-bottom:4px">肌肤照片（可选，自动压缩）</div>
+      <input type="file" id="skinImg" accept="image/*">
+      <img id="preview" class="thumb" style="display:none;margin-top:8px">
+    </div>
+  </div>
+  <div class="footer">
+    <div class="row" style="justify-content:space-between">
+      <button id="delImg">删除图片</button>
+      <div>
+        <button id="delNote">清除记录</button>
+        <button class="primary" id="saveNote">保存</button>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<!-- 锁屏 -->
+<dialog id="lock">
+  <div class="dlg">
+    <h3 style="margin-bottom:10px">已加锁</h3>
+    <div class="row">
+      <input type="password" id="pinInput" inputmode="numeric" placeholder="输入 PIN（4–12位）" style="width:220px">
+      <button class="primary" id="unlockBtn">解锁</button>
+    </div>
+    <div id="lockMsg" class="muted" style="margin-top:6px"></div>
+  </div>
+</dialog>
+
+<script>
+/* ========= 小工具：本地日期键，避免时区偏差 ========= */
+const pad = n => String(n).padStart(2,'0');
+const dateKey = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const fromKey = k => { const [y,m,d]=k.split('-').map(Number); return new Date(y, m-1, d, 12); }; // 用中午避免DST
+const addDays = (d,n) => new Date(d.getFullYear(), d.getMonth(), d.getDate()+n, 12);
+const diffDays = (a,b) => Math.round((+new Date(a.getFullYear(),a.getMonth(),a.getDate(),12) - +new Date(b.getFullYear(),b.getMonth(),b.getDate(),12))/86400000);
+const isBetween = (d,a,b) => diffDays(d,a) >= 0 && diffDays(d,b) <= 0;
+const $ = s => document.querySelector(s);
+
+/* ========= 数据：localStorage（轻） + IndexedDB（图像） ========= */
+const DB_KEY = 'periodDB_v3';
+const loadDB = () => {
+  try{ return JSON.parse(localStorage.getItem(DB_KEY)) || {
+    profile:{periodLength:5, cycleLength:28},
+    cycles:[], // {start:"YYYY-MM-DD", periodLength, cycleLength}
+    notes:{}  // "YYYY-MM-DD": { mood:"🙂", moon:1..4, skinText:"", phase?:'p'|'f'|'o'|'l', hasImg?:true }
+  }; }catch(e){ return {profile:{periodLength:5,cycleLength:28},cycles:[],notes:{}}; }
+};
+const saveDB = db => localStorage.setItem(DB_KEY, JSON.stringify(db));
+let DB = loadDB();
+
+/* ---- IndexedDB 封装（存 dataURL，便于备份导出） ---- */
+const IDB_NAME='periodMedia_v1', STORE='images';
+function idbOpen(){
+  return new Promise((res,rej)=>{
+    const r = indexedDB.open(IDB_NAME,1);
+    r.onupgradeneeded = ()=> r.result.createObjectStore(STORE,{keyPath:'date'});
+    r.onsuccess = ()=> res(r.result);
+    r.onerror = ()=> rej(r.error);
+  });
+}
+async function idbGet(date){ const db=await idbOpen(); return new Promise((res,rej)=>{
+  const tx=db.transaction(STORE,'readonly'); const st=tx.objectStore(STORE);
+  const g=st.get(date); g.onsuccess=()=>res(g.result||null); g.onerror=()=>rej(g.error);
+});}
+async function idbSet(date, dataURL){ const db=await idbOpen(); return new Promise((res,rej)=>{
+  const tx=db.transaction(STORE,'readwrite'); const st=tx.objectStore(STORE);
+  const p=st.put({date,dataURL,updated:Date.now()}); p.onsuccess=()=>res(); p.onerror=()=>rej(p.error);
+});}
+async function idbDel(date){ const db=await idbOpen(); return new Promise((res,rej)=>{
+  const tx=db.transaction(STORE,'readwrite'); const st=tx.objectStore(STORE);
+  const d=st.delete(date); d.onsuccess=()=>res(); d.onerror=()=>rej(d.error);
+});}
+async function idbAll(){ const db=await idbOpen(); return new Promise((res,rej)=>{
+  const tx=db.transaction(STORE,'readonly'); const st=tx.objectStore(STORE);
+  const out={}; st.openCursor().onsuccess=e=>{ const c=e.target.result; if(c){ out[c.key]=c.value.dataURL; c.continue(); }else res(out); };
+  tx.onerror=()=>rej(tx.error);
+});}
+async function idbClear(){ const db=await idbOpen(); return new Promise((res,rej)=>{
+  const tx=db.transaction(STORE,'readwrite'); const st=tx.objectStore(STORE);
+  const c=st.clear(); c.onsuccess=()=>res(); c.onerror=()=>rej(c.error);
+});}
+
+/* ========= 视图状态 ========= */
+let view = (()=>{
+  const t=new Date(); return { y:t.getFullYear(), m:t.getMonth() }; // 0-11
+})();
+
+/* ========= 周期/阶段计算 ========= */
+function median(arr){
+  if(!arr.length) return null;
+  const a=[...arr].sort((x,y)=>x-y);
+  const mid=Math.floor(a.length/2);
+  return a.length%2? a[mid] : Math.round((a[mid-1]+a[mid])/2);
+}
+function recentMedianCycle(len=6){
+  const list=[...DB.cycles].sort((a,b)=>a.start.localeCompare(b.start)).slice(-len);
+  const cs=list.map(x=>Number(x.cycleLength)||28), ps=list.map(x=>Number(x.periodLength)||5);
+  return {cMed: median(cs)||28, pMed: median(ps)||5};
+}
+
+function getCycleForDate(date){
+  if(DB.cycles.length===0) return null;
+  const list = [...DB.cycles].sort((a,b)=>a.start.localeCompare(b.start));
+  const dKey = dateKey(date);
+  let base = null;
+  for(const c of list){ if(c.start <= dKey) base = c; else break; }
+  if(!base) return null;
+  const cLen = Number(base.cycleLength) || Number(DB.profile.cycleLength) || 28;
+  let s = fromKey(base.start);
+  if(diffDays(date, s) >= cLen){
+    const k = Math.floor(diffDays(date, s)/cLen);
+    s = addDays(s, k*cLen);
+  }
+  const pLen = Number(base.periodLength) || Number(DB.profile.periodLength) || 5;
+  return { start:s, pLen, cLen };
+}
+
+function phaseWindows(start, pLen, cLen){
+  const mStart = start;
+  const mEnd   = addDays(start, pLen-1);
+  const oStart = addDays(start, cLen-14-1);  // 高峰 3 天：[-1, +1]
+  const oEnd   = addDays(start, cLen-14+1);
+  const lStart = addDays(start, cLen-14+2);
+  const lEnd   = addDays(start, cLen-1);
+  const fStart = addDays(mEnd, 1);
+  const fEnd   = addDays(oStart, -1);
+  return { mStart,mEnd,fStart,fEnd,oStart,oEnd,lStart,lEnd };
+}
+
+function getPhaseForDate(date){
+  const key = dateKey(date);
+  const override = DB.notes[key]?.phase;
+  if(override) return override; // 手动覆盖优先
+  const cy = getCycleForDate(date);
+  if(!cy) return '';
+  const W = phaseWindows(cy.start, cy.pLen, cy.cLen);
+  if(isBetween(date, W.mStart, W.mEnd)) return 'p';
+  if(isBetween(date, W.fStart, W.fEnd)) return 'f';
+  if(isBetween(date, W.oStart, W.oEnd)) return 'o';
+  if(isBetween(date, W.lStart, W.lEnd)) return 'l';
+  return '';
+}
+
+/* ========= 皮肤恢复友好度（自动标签） ========= */
+function skinFavorLabel(phase){
+  switch(phase){
+    case 'f': return '利于恢复';
+    case 'o': return '平衡观察';
+    case 'l': return '易波动';
+    case 'p': return '敏感';
+    default:  return '—';
+  }
+}
+
+/* ========= 渲染：日历 + 摘要 ========= */
+const cal = $('#cal'), monthLabel = $('#monthLabel');
+async function renderCalendar(){
+  const y=view.y, m=view.m;
+  const first = new Date(y, m, 1, 12);
+  const last  = new Date(y, m+1, 0, 12);
+  monthLabel.textContent = `${y} 年 ${m+1} 月`;
+
+  cal.innerHTML = '';
+  const header = document.createElement('tr');
+  '日一二三四五六'.split('').forEach(w=>{ const th=document.createElement('th'); th.textContent=w; header.appendChild(th); });
+  cal.appendChild(header);
+
+  let tr = document.createElement('tr');
+  for(let i=0;i<first.getDay();i++){ tr.appendChild(document.createElement('td')); }
+
+  for(let d=1; d<=last.getDate(); d++){
+    const cur = new Date(y, m, d, 12);
+    const k   = dateKey(cur);
+    const td  = document.createElement('td');
+
+    const dd = document.createElement('div'); dd.className='d'; dd.textContent=d; td.appendChild(dd);
+
+    const ph = getPhaseForDate(cur);
+    if(ph) td.classList.add(ph);
+
+    if(k === dateKey(new Date())) td.classList.add('today');
+
+    const box = document.createElement('div'); box.className='note';
+    const mood = DB.notes[k]?.mood || '';
+    const moonLevel = DB.notes[k]?.moon || 0;
+    const moonIcon = ['', '🌑','🌒','🌗','🌕'][moonLevel] || '';
+    const left = document.createElement('span'); left.textContent = mood;
+    const right = document.createElement('span'); right.textContent = moonIcon;
+    box.appendChild(left); box.appendChild(right);
+
+    const icons = document.createElement('div'); icons.className='icons';
+    if(DB.notes[k]?.skinText) icons.insertAdjacentText('beforeend','💬');
+    if(DB.notes[k]?.hasImg)   icons.insertAdjacentText('beforeend','📷');
+    box.appendChild(icons);
+
+    td.appendChild(box);
+    td.dataset.date = k;
+    td.addEventListener('click', ()=> openEditor(k, ph));
+
+    tr.appendChild(td);
+    if(cur.getDay()===6 || d===last.getDate()){ cal.appendChild(tr); tr=document.createElement('tr'); }
+  }
+
+  renderSummary();
+}
+
+function nextPredictedStart(){
+  if(!DB.cycles.length) return null;
+  const {cMed, pMed} = recentMedianCycle();
+  const list=[...DB.cycles].sort((a,b)=>a.start.localeCompare(b.start));
+  let t = fromKey(list.at(-1).start);
+  const today = new Date();
+  while(diffDays(t, today) <= 0){ t = addDays(t, cMed); }
+  return {start:t, cLen:cMed, pLen:pMed};
+}
+
+function renderSummary(){
+  const mid = new Date(view.y, view.m, 15, 12);
+  const s = $('#summary');
+
+  if(DB.cycles.length===0){
+    s.innerHTML = `<b>摘要</b><br><span class="muted">尚无周期记录，请先上方保存一次“本次月经第 1 天”。</span>`;
+    return;
+  }
+  const cy = getCycleForDate(mid);
+  if(!cy){
+    s.innerHTML = `<b>摘要</b><br><span class="muted">此月份早于首个记录，向后翻月或添加更早记录。</span>`;
+    return;
+  }
+  const {mStart,mEnd,fStart,fEnd,oStart,oEnd,lStart,lEnd} = phaseWindows(cy.start, cy.pLen, cy.cLen);
+
+  const np = nextPredictedStart();
+  const nextPred = np ? dateKey(np.start) : '—';
+
+  const today = new Date();
+  const todayPhase = getPhaseForDate(today);
+  const todayTip = skinFavorLabel(todayPhase);
+
+  // 本月心情/月相分布
+  const last  = new Date(view.y, view.m+1, 0, 12);
+  let moodCnt = {}, moonCnt=[0,0,0,0,0];
+  for(let d=1; d<=last.getDate(); d++){
+    const k = dateKey(new Date(view.y, view.m, d, 12));
+    const note = DB.notes[k];
+    if(note){
+      if(note.mood) moodCnt[note.mood]=(moodCnt[note.mood]||0)+1;
+      if(note.moon) moonCnt[note.moon]++;
+    }
+  }
+  const topMood = Object.entries(moodCnt).sort((a,b)=>b[1]-a[1])[0]?.[0] || '—';
+  const moonIcons=['','🌑','🌒','🌗','🌕'];
+  const moonDist = moonCnt.slice(1).map((n,i)=>`${moonIcons[i+1]}×${n}`).join('，') || '—';
+
+  s.innerHTML = `
+    <b>摘要（以本月中旬所在的周期为基准）</b><br>
+    经期：${dateKey(mStart)} — ${dateKey(mEnd)}（${cy.pLen} 天）<br>
+    卵泡期：${dateKey(fStart)} — ${dateKey(fEnd)}（利于恢复）<br>
+    排卵高峰：${dateKey(oStart)} — ${dateKey(oEnd)}（平衡观察）<br>
+    黄体期：${dateKey(lStart)} — ${dateKey(lEnd)}（易波动）<br>
+    最近记录推算的下一次月经：<span class="kbd">${nextPred}</span><br>
+    今日皮肤友好度：<span class="kbd">${todayTip}</span><br>
+    本月心情最多：${topMood}；月相分布：${moonDist}
+  `;
+}
+
+/* ========= 编辑器 ========= */
+const editor = $('#editor');
+let editKey = null, pendingImg = null;
+async function openEditor(k, phase){
+  editKey = k; pendingImg = null;
+  $('#dlgTitle').textContent = `编辑 ${k}（${skinFavorLabel(phase)}）`;
+  $('#moodInput').value = DB.notes[k]?.mood || '';
+  $('#skinText').value = DB.notes[k]?.skinText || '';
+  $('#phaseOverride').value = DB.notes[k]?.phase || '';
+
+  const level = DB.notes[k]?.moon || 0;
+  document.querySelectorAll('.moon').forEach(el=>{
+    el.classList.toggle('sel', Number(el.dataset.v)===level);
+    el.onclick = ()=> {
+      document.querySelectorAll('.moon').forEach(x=>x.classList.remove('sel'));
+      el.classList.add('sel');
+      editor.dataset.moon = el.dataset.v;
+    };
+  });
+  editor.dataset.moon = String(level||0);
+
+  // 预览图片（从IndexedDB）
+  const prev = $('#preview');
+  const imgRec = await idbGet(k);
+  if(imgRec){ prev.src = imgRec.dataURL; prev.style.display='block'; }
+  else { prev.removeAttribute('src'); prev.style.display='none'; }
+
+  $('#skinImg').value = '';
+  editor.showModal();
+}
+
+/* 图片压缩到 ~1280 宽/高，JPEG 82% */
+function compressImage(file){
+  return new Promise((resolve,reject)=>{
+    const fr = new FileReader();
+    fr.onload = ()=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const max = 1280;
+        let {width:w, height:h} = img;
+        const r = Math.min(1, max/Math.max(w,h));
+        const cw = Math.round(w*r), ch = Math.round(h*r);
+        const cv = document.createElement('canvas'); cv.width=cw; cv.height=ch;
+        const ctx = cv.getContext('2d');
+        ctx.drawImage(img,0,0,cw,ch);
+        let url;
+        try{ url = cv.toDataURL('image/jpeg',0.82); }
+        catch{ url = cv.toDataURL('image/png'); }
+        resolve(url);
+      };
+      img.onerror = reject;
+      img.src = fr.result;
+    };
+    fr.onerror = reject;
+    fr.readAsDataURL(file);
+  });
+}
+
+$('#skinImg').addEventListener('change', async (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  const url = await compressImage(file);
+  pendingImg = url;
+  const prev=$('#preview'); prev.src=url; prev.style.display='block';
+});
+$('#delImg').onclick = async ()=>{
+  if(!editKey) return;
+  await idbDel(editKey); pendingImg=null;
+  if(DB.notes[editKey]) DB.notes[editKey].hasImg=false;
+  saveDB(DB);
+  const prev=$('#preview'); prev.removeAttribute('src'); prev.style.display='none';
+};
+
+$('#saveNote').onclick = async ()=>{
+  if(!editKey){ editor.close(); return; }
+  const mood = $('#moodInput').value.trim();
+  const moon = Number(editor.dataset.moon||0);
+  const skinText = $('#skinText').value.trim();
+  const phase = $('#phaseOverride').value;
+
+  DB.notes[editKey] = { ...(DB.notes[editKey]||{}), mood, moon, skinText };
+  if(phase) DB.notes[editKey].phase = phase; else delete DB.notes[editKey].phase;
+
+  if(pendingImg){ await idbSet(editKey, pendingImg); DB.notes[editKey].hasImg = true; }
+
+  // 若全空则删除
+  const n = DB.notes[editKey];
+  if(!n.mood && !n.moon && !n.skinText && !n.hasImg && !n.phase) delete DB.notes[editKey];
+
+  saveDB(DB);
+  editor.close(); renderCalendar();
+};
+$('#delNote').onclick = async ()=>{
+  if(editKey && DB.notes[editKey]) delete DB.notes[editKey];
+  await idbDel(editKey);
+  saveDB(DB); editor.close(); renderCalendar();
+};
+
+/* ========= 交互：保存周期 / 设为默认 / 导航 ========= */
+$('#saveCycle').onclick = ()=>{
+  const s = $('#startDate').value;
+  if(!s) return alert('请选择“本次月经第 1 天”。');
+  const p = Number($('#periodLength').value)||5;
+  const c = Number($('#cycleLength').value)||28;
+  const i = DB.cycles.findIndex(x=>x.start===s);
+  if(i>=0) DB.cycles[i] = {start:s, periodLength:p, cycleLength:c};
+  else DB.cycles.push({start:s, periodLength:p, cycleLength:c});
+  const d = fromKey(s); view.y=d.getFullYear(); view.m=d.getMonth();
+  saveDB(DB); renderCalendar();
+};
+$('#setDefaults').onclick = ()=>{
+  DB.profile.periodLength = Number($('#periodLength').value)||5;
+  DB.profile.cycleLength  = Number($('#cycleLength').value)||28;
+  saveDB(DB); alert('已设为默认。');
+};
+$('#prevM').onclick = ()=>{ view.m--; if(view.m<0){view.m=11;view.y--;} renderCalendar(); };
+$('#nextM').onclick = ()=>{ view.m++; if(view.m>11){view.m=0;view.y++;} renderCalendar(); };
+$('#today').onclick  = ()=>{ const t=new Date(); view.y=t.getFullYear(); view.m=t.getMonth(); renderCalendar(); };
+
+/* ========= 备份 / 导入 / .ics / 清空 ========= */
+$('#exportBtn').onclick = async ()=>{
+  const images = await idbAll();
+  const payload = {db:DB, images};
+  const blob = new Blob([JSON.stringify(payload)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'period-backup.json'; a.click(); URL.revokeObjectURL(a.href);
+};
+$('#importBtn').onclick = ()=> $('#importFile').click();
+$('#importFile').onchange = e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = async ()=>{
+    try{
+      const obj = JSON.parse(r.result);
+      if(obj.db) DB = obj.db; else DB = obj; // 兼容旧格式
+      saveDB(DB);
+      if(obj.images){
+        for(const [k,v] of Object.entries(obj.images)){ await idbSet(k, v); if(DB.notes[k]) DB.notes[k].hasImg=true; }
+        saveDB(DB);
+      }
+      location.reload();
+    }catch{ alert('文件格式不对'); }
+  };
+  r.readAsText(f);
+};
+
+function icsDate(key){ const [y,m,d]=key.split('-').map(Number); return `${y}${pad(m)}${pad(d)}`; }
+$('#icsBtn').onclick = ()=>{
+  const np = nextPredictedStart();
+  if(!np){ alert('还没有足够数据用于预测。'); return; }
+  const startKey = dateKey(np.start);
+  const periodEndKey = dateKey(addDays(np.start, np.pLen)); // ics DTEND 为次日（排除式）
+  const ovCenter = addDays(np.start, -14);
+  const ovStartKey = dateKey(addDays(ovCenter, -1));
+  const ovEndKeyEx = dateKey(addDays(ovCenter, 2));
+  const uid = ()=>'xxxxxx'.replace(/x/g,()=>Math.floor(Math.random()*16).toString(16))+Date.now();
+  const ics = [
+    'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//period-local//cn//',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+      `UID:${uid()}`,
+      'SUMMARY:经期（预测）',
+      `DTSTART;VALUE=DATE:${icsDate(startKey)}`,
+      `DTEND;VALUE=DATE:${icsDate(periodEndKey)}`,
+    'END:VEVENT',
+    'BEGIN:VEVENT',
+      `UID:${uid()}`,
+      'SUMMARY:排卵高峰（预测）',
+      `DTSTART;VALUE=DATE:${icsDate(ovStartKey)}`,
+      `DTEND;VALUE=DATE:${icsDate(ovEndKeyEx)}`,
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\r\n');
+  const blob = new Blob([ics], {type:'text/calendar'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'period-prediction.ics'; a.click(); URL.revokeObjectURL(a.href);
+};
+
+$('#wipeAll').onclick = async ()=>{
+  if(!confirm('确定清空所有数据？此操作不可撤销。')) return;
+  localStorage.removeItem(DB_KEY);
+  await idbClear();
+  location.reload();
+};
+
+/* ========= PIN 加锁 ========= */
+async function sha256(str){
+  const enc = new TextEncoder().encode(str);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  const b = Array.from(new Uint8Array(buf)).map(x=>x.toString(16).padStart(2,'0')).join('');
+  return b;
+}
+function getPIN(){ try{ return JSON.parse(localStorage.getItem('periodPIN')||'null'); }catch{ return null; } }
+function setPINHash(hash){ localStorage.setItem('periodPIN', JSON.stringify({hash})); }
+function clearPIN(){ localStorage.removeItem('periodPIN'); }
+
+$('#setPIN').onclick = async ()=>{
+  const p = prompt('设置/修改 PIN（4–12位，留空取消）'); if(!p) return;
+  if(p.length<4 || p.length>12) return alert('长度应在 4–12 位。');
+  const h = await sha256(p); setPINHash(h); alert('已设置 PIN。');
+};
+$('#clearPIN').onclick = ()=>{ clearPIN(); alert('已关闭 PIN。'); };
+
+async function checkLock(){
+  const pin = getPIN(); if(!pin) return;
+  const lock = $('#lock'); lock.showModal();
+  $('#pinInput').value=''; $('#lockMsg').textContent='';
+  $('#unlockBtn').onclick = async ()=>{
+    const h = await sha256($('#pinInput').value||'');
+    if(h===pin.hash){ lock.close(); }
+    else{ $('#lockMsg').textContent='PIN 错误'; }
+  };
+}
+
+/* ========= PWA（本地文件模式可能无法注册 SW，忽略失败即可） ========= */
+(function setupPWA(){
+  try{
+    // 生成一个简单图标
+    const cv=document.createElement('canvas'); cv.width=192; cv.height=192;
+    const ctx=cv.getContext('2d'); ctx.fillStyle='#e9f7ef'; ctx.fillRect(0,0,192,192);
+    ctx.fillStyle='#2d6a4f'; ctx.beginPath(); ctx.arc(96,96,58,0,Math.PI*2); ctx.fill();
+    const icon=cv.toDataURL('image/png');
+    const manifest={
+      name:'经期记录', short_name:'经期记录', start_url:'./', display:'standalone',
+      background_color:'#e9f7ef', theme_color:'#2d6a4f',
+      icons:[{src:icon,sizes:'192x192',type:'image/png'}]
+    };
+    const mblob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
+    const murl=URL.createObjectURL(mblob);
+    const link=document.createElement('link'); link.rel='manifest'; link.href=murl; document.head.appendChild(link);
+
+    if('serviceWorker' in navigator && location.protocol!=='file:'){
+      const swCode=`
+        const CACHE='period-cache-v1';
+        self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./']))); self.skipWaiting();});
+        self.addEventListener('activate',e=>{e.waitUntil(self.clients.claim());});
+        self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).then(res=>{
+          const copy=res.clone(); caches.open(CACHE).then(c=>c.put(e.request,copy)); return res;
+        }).catch(()=>r)));});
+      `;
+      const swBlob=new Blob([swCode],{type:'text/javascript'});
+      const swUrl=URL.createObjectURL(swBlob);
+      navigator.serviceWorker.register(swUrl).catch(()=>{});
+    }
+  }catch(e){}
+})();
+
+/* ========= 初始化 ========= */
+(async function init(){
+  // 初始表单使用最近一次记录或默认
+  if(DB.cycles.length){
+    const last = [...DB.cycles].sort((a,b)=>a.start.localeCompare(b.start)).at(-1);
+    $('#startDate').value   = last.start;
+    $('#periodLength').value= last.periodLength;
+    $('#cycleLength').value = last.cycleLength;
+    const d = fromKey(last.start); view.y=d.getFullYear(); view.m=d.getMonth();
+  }else{
+    $('#periodLength').value = DB.profile.periodLength;
+    $('#cycleLength').value  = DB.profile.cycleLength;
+  }
+  await checkLock();
+  renderCalendar();
+})();
+</script>
+</body>
+</html>
