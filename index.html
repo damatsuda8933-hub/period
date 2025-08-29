@@ -19,16 +19,25 @@
   .wrap{max-width:820px;margin:20px auto;padding:0 16px 36px}
   h1{font-size:20px;margin:14px 0}
   .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  input,button,select,textarea{padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+  input,button,select,textarea{
+    padding:8px 12px;border:1px solid var(--line);border-radius:14px;background:var(--card)
+  }
   button.primary{background:#2d6a4f;color:#fff;border-color:#2d6a4f}
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:12px}
-  .toolbar{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
-  .toolbar .nav button{padding:6px 10px}
   .muted{color:var(--muted);font-size:14px}
 
-  /* 图例（只保留四期） */
-  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
-  .sw{display:inline-block;width:16px;height:14px;border-radius:4px;vertical-align:-2px;margin-right:6px;border:1px solid var(--line)}
+  /* 工具栏两行布局 */
+  .toolbar{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+  .topbar{display:flex;justify-content:space-between;align-items:center}
+  .topbar .nav{display:flex;gap:8px}
+  .secondbar{display:flex;gap:8px}
+  .month{font-weight:600;color:#2e4b3f}
+
+  /* 图例（四项对齐） */
+  .legend{display:block}
+  .legend-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .legend-item{display:flex;align-items:center;gap:8px;min-height:28px}
+  .legend .sw{display:inline-block;width:16px;height:14px;border-radius:4px;border:1px solid var(--line)}
   .sw.p{background:var(--pink)} .sw.f{background:var(--mint)} .sw.o{background:var(--blue)} .sw.l{background:var(--gold)}
 
   /* 日历 */
@@ -61,7 +70,8 @@
   .moon.sel{outline:2px solid #2d6a4f}
   .footer{margin-top:2px;padding:10px;background:#f6fcf9;border-top:1px solid var(--line);border-bottom-left-radius:14px;border-bottom-right-radius:14px}
   .thumb{width:100%;max-height:220px;object-fit:contain;border:1px solid var(--line);border-radius:10px;background:#fff}
-  /* 图库对话框 */
+
+  /* 图库 */
   #galleryDlg{max-width:940px}
   .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;padding:10px}
   .tile{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
@@ -71,6 +81,15 @@
 
   .kbd{font-family:ui-monospace,Menlo,Consolas,monospace;background:#eef6f0;border:1px solid var(--line);border-radius:6px;padding:2px 6px}
   .danger{background:#8c2f39;color:#fff;border-color:#8c2f39}
+
+  /* 心情反馈 toast + 彩带 */
+  .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%) translateY(6px);
+    background:rgba(0,0,0,.78);color:#fff;padding:10px 14px;border-radius:20px;font-size:14px;
+    z-index:9999;opacity:0;transition:opacity .18s, transform .18s}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .confetti{position:fixed;inset:0;pointer-events:none;z-index:9998}
+  .confetti i{position:absolute;top:-10px;width:8px;height:12px;opacity:.9;animation:fall 1.8s linear forwards}
+  @keyframes fall{to{transform:translateY(110vh) rotate(360deg);opacity:.95}}
 </style>
 </head>
 <body>
@@ -89,26 +108,30 @@
     <div class="muted" style="margin-top:6px">长期保存多个周期；预测使用最近 6 次中位数，仅供参考。</div>
   </div>
 
-  <!-- 工具栏 -->
+  <!-- 工具栏（两行） -->
   <div class="toolbar">
-    <div class="nav">
-      <button id="prevM">◀ 上月</button>
-      <button id="today">今月</button>
-      <button id="nextM">下月 ▶</button>
+    <div class="topbar">
+      <div class="nav">
+        <button id="prevM">◀ 上月</button>
+        <button id="today">今月</button>
+        <button id="nextM">下月 ▶</button>
+      </div>
+      <div class="month" id="monthLabel"></div>
     </div>
-    <div class="row">
+    <div class="secondbar">
       <button id="openGallery">打开图库</button>
       <button id="openYear">年度总结</button>
     </div>
-    <div class="muted" id="monthLabel"></div>
   </div>
 
-  <!-- 图例（仅四期） -->
+  <!-- 图例（四项对齐） -->
   <div class="legend card">
-    <div><span class="sw p"></span>经期</div>
-    <div><span class="sw f"></span>卵泡期</div>
-    <div><span class="sw o"></span>排卵高峰（3 天）</div>
-    <div><span class="sw l"></span>黄体期</div>
+    <div class="legend-grid">
+      <div class="legend-item"><span class="sw p"></span><span>经期</span></div>
+      <div class="legend-item"><span class="sw f"></span><span>卵泡期</span></div>
+      <div class="legend-item"><span class="sw o"></span><span>排卵高峰（3 天）</span></div>
+      <div class="legend-item"><span class="sw l"></span><span>黄体期</span></div>
+    </div>
   </div>
 
   <!-- 日历 -->
@@ -132,7 +155,7 @@
   </div>
 </div>
 
-<!-- 编辑对话框（保留心情与月相、肌肤文本/照片、阶段覆盖） -->
+<!-- 编辑对话框 -->
 <dialog id="editor">
   <div class="dlg">
     <h3 id="dlgTitle">编辑</h3>
@@ -222,7 +245,7 @@ const isBetween = (d,a,b) => diffDays(d,a) >= 0 && diffDays(d,b) <= 0;
 const $ = s => document.querySelector(s);
 
 /* ===== 数据（localStorage + IndexedDB） ===== */
-const DB_KEY = 'periodDB_v4';
+const DB_KEY = 'periodDB_v5';
 const loadDB = () => {
   try{ return JSON.parse(localStorage.getItem(DB_KEY)) || {
     profile:{periodLength:5, cycleLength:28},
@@ -424,7 +447,10 @@ $('#saveNote').onclick=async ()=>{
   if(phase) DB.notes[editKey].phase=phase; else delete DB.notes[editKey].phase;
   if(pendingImg){ await idbSet(editKey, pendingImg); DB.notes[editKey].hasImg=true; }
   const n=DB.notes[editKey]; if(!n.mood && !n.moon && !n.skinText && !n.hasImg && !n.phase) delete DB.notes[editKey];
-  saveDB(DB); editor.close(); renderCalendar();
+  saveDB(DB);
+  editor.close();
+  renderCalendar();
+  if(mood) reactToMood(mood);   // 保存后根据心情弹出留言/特效
 };
 $('#delNote').onclick=async ()=>{ if(editKey&&DB.notes[editKey]) delete DB.notes[editKey]; await idbDel(editKey); saveDB(DB); editor.close(); renderCalendar(); };
 
@@ -462,15 +488,87 @@ $('#icsBtn').onclick=()=>{ const np=nextPredictedStart(); if(!np) return alert('
   const blob=new Blob([ics],{type:'text/calendar'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='period-prediction.ics'; a.click(); URL.revokeObjectURL(a.href); };
 $('#wipeAll').onclick=async ()=>{ if(!confirm('确定清空所有数据？此操作不可撤销。')) return; localStorage.removeItem(DB_KEY); await idbClear(); location.reload(); };
 
-/* ===== PIN 加锁（简版） ===== */
+/* ===== PIN 加锁（Promise 版，便于等待解锁后再提示） ===== */
 async function sha256(str){ const enc=new TextEncoder().encode(str); const buf=await crypto.subtle.digest('SHA-256',enc); return Array.from(new Uint8Array(buf)).map(x=>x.toString(16).padStart(2,'0')).join(''); }
 function getPIN(){ try{return JSON.parse(localStorage.getItem('periodPIN')||'null');}catch{return null;} }
 function setPINHash(hash){ localStorage.setItem('periodPIN', JSON.stringify({hash})); }
 function clearPIN(){ localStorage.removeItem('periodPIN'); }
 $('#setPIN').onclick=async ()=>{ const p=prompt('设置/修改 PIN（4–12位，留空取消）'); if(!p) return; if(p.length<4||p.length>12) return alert('长度应在 4–12 位。'); const h=await sha256(p); setPINHash(h); alert('已设置 PIN。'); };
 $('#clearPIN').onclick=()=>{ clearPIN(); alert('已关闭 PIN。'); };
-async function checkLock(){ const pin=getPIN(); if(!pin) return; const lock=$('#lock'); lock.showModal(); $('#pinInput').value=''; $('#lockMsg').textContent='';
-  $('#unlockBtn').onclick=async ()=>{ const h=await sha256($('#pinInput').value||''); if(h===pin.hash){ lock.close(); } else { $('#lockMsg').textContent='PIN 错误'; } }; }
+function waitUnlock(){
+  return new Promise(resolve=>{
+    const pin=getPIN(); if(!pin){ resolve(); return; }
+    const lock=$('#lock'); lock.showModal(); $('#pinInput').value=''; $('#lockMsg').textContent='';
+    $('#unlockBtn').onclick=async ()=>{ const h=await sha256($('#pinInput').value||''); if(h===pin.hash){ lock.close(); resolve(); } else { $('#lockMsg').textContent='PIN 错误'; } };
+  });
+}
+
+/* ===== 心情识别 & 留言/特效 ===== */
+const MOOD_REGEX = {
+  happy: /[😀😃😄😁😆😊🙂😍🥰😘🤩🥳😺😸😹✨🎉👍❤️💖]/u,
+  sad:   /[😢😭🥲😞😔☹️🙁🥺😿💧]/u,
+  sick:  /[🤧🤒🤢🤮🤕😷🥴]/u,
+  angry: /[😠😡🤬👿💢]/u,
+  anxious:/[😰😥😓😱😨😟😬]/u,
+  tired: /[😪😴🥱]/u
+};
+function classifyMood(text){
+  if(!text) return 'neutral';
+  if(MOOD_REGEX.happy.test(text)) return 'happy';
+  if(MOOD_REGEX.sad.test(text))   return 'sad';
+  if(MOOD_REGEX.sick.test(text))  return 'sick';
+  if(MOOD_REGEX.angry.test(text)) return 'angry';
+  if(MOOD_REGEX.anxious.test(text)) return 'anxious';
+  if(MOOD_REGEX.tired.test(text)) return 'tired';
+  return 'neutral';
+}
+const MOOD_LINES = {
+  happy:  ['耶！今天好闪亮～保持这份好心情 ✨','小确幸记录成功，给你一朵大花🌼','把快乐存进电池里啦🔋'],
+  sad:    ['抱抱你～难过会过去，我在这儿🤍','对自己温柔一点，慢慢来就好🌙','允许自己休息一下，好吗？☁️'],
+  sick:   ['多喝水多休息，早点好起来🍵','今天轻量模式，照顾自己最重要🫂','记得保暖与早睡～🌿'],
+  angry:  ['先深呼吸三次，我们一起放下不快🌬️','你的感受被看见了，我懂🙌','允许情绪来去，别为难自己💚'],
+  anxious:['试试 4-7-8 呼吸法，放松一下🌊','把担心写下来，交给明天处理📄','现在专注眼前一分钟就好⌛'],
+  tired:  ['辛苦了，睡一觉会更好😴','补点能量再出发🍫','今天给自己多一点耐心～🫶'],
+  neutral:['继续记录，未来的你会感谢现在📘','稳稳的一天，做得好～','保持节奏，慢慢变好🌱']
+};
+function randLine(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function showToast(msg){
+  const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t);
+  requestAnimationFrame(()=>t.classList.add('show'));
+  setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(),200); }, 2200);
+}
+function confettiBurst(){
+  const colors=['#76d7c4','#f7dc6f','#ff8ba7','#7fb3d5','#82e0aa'];
+  const wrap=document.createElement('div'); wrap.className='confetti'; document.body.appendChild(wrap);
+  for(let i=0;i<36;i++){
+    const p=document.createElement('i');
+    p.style.left=Math.random()*100+'vw';
+    p.style.background=colors[Math.floor(Math.random()*colors.length)];
+    p.style.transform=`translateY(0) rotate(${Math.random()*360}deg)`;
+    p.style.animationDuration=(1.3+Math.random()*1.2)+'s';
+    p.style.width=(6+Math.random()*6)+'px';
+    p.style.height=(8+Math.random()*10)+'px';
+    wrap.appendChild(p);
+  }
+  setTimeout(()=>wrap.remove(), 2000);
+}
+function reactToMood(moodText){
+  const tag = classifyMood(moodText);
+  showToast(randLine(MOOD_LINES[tag]));
+  if(tag==='happy') confettiBurst();
+}
+
+/* 每日随机留言：一天一次。优先依据“今天/昨天”的心情，没有就 neutral */
+function dailyHello(){
+  const key = dateKey(new Date());
+  let last = null; try{ last = JSON.parse(localStorage.getItem('periodDailyMsg_v1')||'null'); }catch{}
+  if(last && last.date === key) return; // 今天已经弹过
+  const todayMood = DB.notes[key]?.mood || '';
+  const yMood = DB.notes[dateKey(addDays(new Date(), -1))]?.mood || '';
+  const baseMood = todayMood || yMood || '';
+  reactToMood(baseMood);
+  localStorage.setItem('periodDailyMsg_v1', JSON.stringify({date:key}));
+}
 
 /* ===== 图库 ===== */
 const galDlg=$('#galleryDlg'), galGrid=$('#galleryGrid'), galYear=$('#galleryYear');
@@ -508,10 +606,14 @@ galYear.onchange = async ()=>{ const all=await idbAll(); renderGalleryYear(galYe
 /* ===== 年度总结 ===== */
 const yearDlg=$('#yearDlg'), yearSel=$('#yearSel'), yearBody=$('#yearBody');
 function listYearsFromNotes(){ const ks=Object.keys(DB.notes); const ys=[...new Set(ks.map(k=>k.slice(0,4)))].filter(Boolean); if(ys.length===0){ ys.push(String(new Date().getFullYear())); } return ys.sort((a,b)=>b.localeCompare(a)); }
-function monthSummaryRow(y,m){
-  const st=monthStats(y,m);
-  return `<tr><td>${m+1}</td><td>${st.avgMoon}</td><td>${st.recDays}</td><td>${st.topMood}</td></tr>`;
+function monthStatsForYear(y,m){
+  const last=new Date(y,m+1,0,12); const moodCnt={}, moons=[], days=last.getDate();
+  for(let d=1; d<=days; d++){ const k=dateKey(new Date(y,m,d,12)); const nt=DB.notes[k]; if(nt){ if(nt.moon) moons.push(nt.moon); if(nt.mood) moodCnt[nt.mood]=(moodCnt[nt.mood]||0)+1; } }
+  const avgMoon=moons.length? (moons.reduce((a,b)=>a+b,0)/moons.length).toFixed(2) : '—';
+  const topMood=Object.entries(moodCnt).sort((a,b)=>b[1]-a[1])[0]?.[0]||'—';
+  return {avgMoon, topMood, days:moons.length};
 }
+function monthSummaryRow(y,m){ const st=monthStatsForYear(y,m); return `<tr><td>${m+1}</td><td>${st.avgMoon}</td><td>${st.days}</td><td>${st.topMood}</td></tr>`; }
 function openYear(){
   const ys=listYearsFromNotes(); yearSel.innerHTML=ys.map(y=>`<option>${y}</option>`).join(''); yearSel.value=yearSel.value||ys[0]; renderYear(+yearSel.value); yearDlg.showModal();
 }
@@ -539,7 +641,37 @@ function renderYear(Y){
 }
 $('#openYear').onclick=openYear; $('#closeYear').onclick=()=>yearDlg.close(); yearSel.onchange=()=>renderYear(+yearSel.value);
 
-/* ===== 初始化 & 锁屏 ===== */
+/* ===== PWA（在 GitHub Pages 上可用；file:// 模式会忽略） ===== */
+(function setupPWA(){
+  try{
+    // 生成一个简单图标
+    const cv=document.createElement('canvas'); cv.width=192; cv.height=192;
+    const ctx=cv.getContext('2d'); ctx.fillStyle='#e9f7ef'; ctx.fillRect(0,0,192,192);
+    ctx.fillStyle='#2d6a4f'; ctx.beginPath(); ctx.arc(96,96,58,0,Math.PI*2); ctx.fill();
+    const icon=cv.toDataURL('image/png');
+    const manifest={ name:'经期记录', short_name:'经期记录', start_url:'./', display:'standalone',
+      background_color:'#e9f7ef', theme_color:'#2d6a4f', icons:[{src:icon,sizes:'192x192',type:'image/png'}] };
+    const mblob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
+    const murl=URL.createObjectURL(mblob);
+    const link=document.createElement('link'); link.rel='manifest'; link.href=murl; document.head.appendChild(link);
+
+    if('serviceWorker' in navigator && location.protocol!=='file:'){
+      const swCode=`
+        const CACHE='period-cache-v1';
+        self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./']))); self.skipWaiting();});
+        self.addEventListener('activate',e=>{e.waitUntil(self.clients.claim());});
+        self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).then(res=>{
+          const copy=res.clone(); caches.open(CACHE).then(c=>c.put(e.request,copy)); return res;
+        }).catch(()=>r)));});
+      `;
+      const swBlob=new Blob([swCode],{type:'text/javascript'});
+      const swUrl=URL.createObjectURL(swBlob);
+      navigator.serviceWorker.register(swUrl).catch(()=>{});
+    }
+  }catch(e){}
+})();
+
+/* ===== 初始化 ===== */
 (async function init(){
   if(DB.cycles.length){
     const last=[...DB.cycles].sort((a,b)=>a.start.localeCompare(b.start)).at(-1);
@@ -548,8 +680,9 @@ $('#openYear').onclick=openYear; $('#closeYear').onclick=()=>yearDlg.close(); ye
   }else{
     $('#periodLength').value=DB.profile.periodLength; $('#cycleLength').value=DB.profile.cycleLength;
   }
-  const pin=getPIN(); if(pin){ const lock=$('#lock'); lock.showModal(); $('#unlockBtn').onclick=async ()=>{ const h=await sha256($('#pinInput').value||''); if(h===pin.hash){ lock.close(); }else{$('#lockMsg').textContent='PIN 错误';} }; }
+  await waitUnlock();       // 解锁后再继续
   renderCalendar();
+  dailyHello();             // 每日随机留言（一天一次）
 })();
 </script>
 </body>
