@@ -10,7 +10,7 @@
     /* 四期颜色：更浅更淡 */
     --pink:#ffe4ec;   /* 经期 */
     --mint:#eaffe6;   /* 卵泡期 */
-    --blue:#def7ff;   /* 排卵高峰（3天）*/
+    --blue:#def7ff;   /* 排卵期（3天窗口）*/
     --gold:#fff6d8;   /* 黄体期 */
     --today:#1b4332;
   }
@@ -30,7 +30,7 @@
   .toolbar{display:flex;flex-direction:column;gap:10px;margin-top:8px}
   .topbar{display:flex;justify-content:space-between;align-items:center}
   .topbar .nav{display:flex;gap:8px}
-  .secondbar{display:flex;gap:8px}
+  .secondbar{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
   .month{font-weight:600;color:#2e4b3f}
 
   /* 图例（四项对齐） */
@@ -48,7 +48,12 @@
   .cal td.p{background:var(--pink)} .cal td.f{background:var(--mint)}
   .cal td.o{background:var(--blue)} .cal td.l{background:var(--gold)}
   .cal td .d{position:absolute;top:6px;left:6px;font-size:12px;color:#2c3e50}
-  .cal td.today{outline:2px dashed var(--today);outline-offset:-4px}
+  /* 今天：白色加粗实线 + 极淡内缘 */
+  .cal td.today{
+    outline:3px solid #fff;
+    outline-offset:-4px;
+    box-shadow:0 0 0 2px rgba(27,67,50,.08) inset;
+  }
   /* 月相强度：给单元格加深一层遮罩（🌑=无；🌒/🌗/🌕 逐级加深） */
   .cal td[data-moon="2"]::after,
   .cal td[data-moon="3"]::after,
@@ -129,7 +134,7 @@
     <div class="legend-grid">
       <div class="legend-item"><span class="sw p"></span><span>经期</span></div>
       <div class="legend-item"><span class="sw f"></span><span>卵泡期</span></div>
-      <div class="legend-item"><span class="sw o"></span><span>排卵高峰（3 天）</span></div>
+      <div class="legend-item"><span class="sw o"></span><span>排卵期</span></div>
       <div class="legend-item"><span class="sw l"></span><span>黄体期</span></div>
     </div>
   </div>
@@ -164,7 +169,7 @@
       <label>阶段覆盖
         <select id="phaseOverride">
           <option value="">自动</option><option value="p">经期</option><option value="f">卵泡期</option>
-          <option value="o">排卵高峰</option><option value="l">黄体期</option>
+          <option value="o">排卵期</option><option value="l">黄体期</option>
         </select>
       </label>
     </div>
@@ -388,7 +393,7 @@ function renderSummary(){
     <b>摘要（以本月中旬所在的周期为基准）</b><br>
     经期：${dateKey(W.mStart)} — ${dateKey(W.mEnd)}（${cy.pLen} 天）<br>
     卵泡期：${dateKey(W.fStart)} — ${dateKey(W.fEnd)}（利于恢复）<br>
-    排卵高峰：${dateKey(W.oStart)} — ${dateKey(W.oEnd)}（平衡观察）<br>
+    排卵期：${dateKey(W.oStart)} — ${dateKey(W.oEnd)}（平衡观察）<br>
     黄体期：${dateKey(W.lStart)} — ${dateKey(W.lEnd)}（易波动）<br>
     预测下一次经期：<span class="kbd">${nextPred}</span><br><br>
     <b>本月 vs 上月</b><br>
@@ -484,11 +489,11 @@ $('#icsBtn').onclick=()=>{ const np=nextPredictedStart(); if(!np) return alert('
   const uid=()=>'xxxxxx'.replace(/x/g,()=>Math.floor(Math.random()*16).toString(16))+Date.now();
   const ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//period-local//cn//','CALSCALE:GREGORIAN','METHOD:PUBLISH',
     'BEGIN:VEVENT',`UID:${uid()}`,'SUMMARY:经期（预测）',`DTSTART;VALUE=DATE:${icsDate(sKey)}`,`DTEND;VALUE=DATE:${icsDate(eKey)}`,'END:VEVENT',
-    'BEGIN:VEVENT',`UID:${uid()}`,'SUMMARY:排卵高峰（预测）',`DTSTART;VALUE=DATE:${icsDate(osKey)}`,`DTEND;VALUE=DATE:${icsDate(oeKeyEx)}`,'END:VEVENT','END:VCALENDAR'].join('\r\n');
+    'BEGIN:VEVENT',`UID:${uid()}`,'SUMMARY:排卵期（预测）',`DTSTART;VALUE=DATE:${icsDate(osKey)}`,`DTEND;VALUE=DATE:${icsDate(oeKeyEx)}`,'END:VEVENT','END:VCALENDAR'].join('\r\n');
   const blob=new Blob([ics],{type:'text/calendar'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='period-prediction.ics'; a.click(); URL.revokeObjectURL(a.href); };
 $('#wipeAll').onclick=async ()=>{ if(!confirm('确定清空所有数据？此操作不可撤销。')) return; localStorage.removeItem(DB_KEY); await idbClear(); location.reload(); };
 
-/* ===== PIN 加锁（Promise 版，便于等待解锁后再提示） ===== */
+/* ===== PIN 加锁（Promise 版） ===== */
 async function sha256(str){ const enc=new TextEncoder().encode(str); const buf=await crypto.subtle.digest('SHA-256',enc); return Array.from(new Uint8Array(buf)).map(x=>x.toString(16).padStart(2,'0')).join(''); }
 function getPIN(){ try{return JSON.parse(localStorage.getItem('periodPIN')||'null');}catch{return null;} }
 function setPINHash(hash){ localStorage.setItem('periodPIN', JSON.stringify({hash})); }
